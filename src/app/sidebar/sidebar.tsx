@@ -10,6 +10,9 @@ export const Sidebar = () => {
           <Link href="/classification">Classification</Link>
         </Item>
         <Item>
+          <Link href="/classification-camera">Classification - Camera</Link>
+        </Item>
+        <Item>
           <Link href="/segmentation">Segmentation</Link>
         </Item>
         <Item>

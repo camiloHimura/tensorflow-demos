@@ -2,29 +2,25 @@
 
 import {
   Button,
-  Divider,
   Flex,
   Heading,
-  Image,
   Text,
-  TextField,
   useNumberFormatter,
   View,
-  Well,
 } from "@adobe/react-spectrum";
-import { useState } from "react";
-import { useIsSSR } from "react-aria";
+import { useRef, useState } from "react";
 
+import { useCamera } from "../hooks/use-camera";
 import { useMobilenetModel } from "../hooks/use-mobilenet-model.hook";
-import { loadImage } from "../utils/image";
 import { Prediction } from "../utils/predictions";
 
 const ClassificationPage = () => {
-  const [url, setUrl] = useState("");
-  const [img, setImg] = useState<null | HTMLImageElement>(null);
+  const isInference = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
   const [prediction, setPrediction] = useState<null | Prediction>(null);
 
+  const video = useCamera();
   const { isLoading: isLoadingModel, model } = useMobilenetModel();
 
   const formatter = useNumberFormatter({
@@ -34,18 +30,29 @@ const ClassificationPage = () => {
   });
 
   const onGetPredictions = async () => {
-    if (model === null || img === null) {
+    console.log("isInference.current", isInference.current);
+    if (model === null || !video.current || isInference.current === false) {
       return;
     }
-    setIsRunningInference(true);
-
-    const newImage = await loadImage(img.src);
-    const [prediction] = await model.classify(newImage);
+    const [prediction] = await model.classify(video.current);
 
     if (prediction !== null) {
       setPrediction(prediction);
     }
     setIsRunningInference(false);
+    requestAnimationFrame(() => onGetPredictions());
+  };
+
+  const onPlay = () => {
+    isInference.current = true;
+    setIsPlaying(true);
+    onGetPredictions();
+  };
+
+  const onPause = () => {
+    isInference.current = false;
+    setIsPlaying(false);
+    onGetPredictions();
   };
 
   return (
@@ -61,33 +68,17 @@ const ClassificationPage = () => {
           width={"100%"}
           UNSAFE_style={{ textAlign: "center" }}
         >
-          Classification {useIsSSR() ? "Server" : "Client"}
+          Classification - camera
         </Heading>
 
-        <Text>Page a image url from staticflickr, for instance</Text>
-        <Well>
-          https://live.staticflickr.com/7544/26280888754_1acb5bdb73_b.jpg
-        </Well>
-
-        <Divider marginY={"size-200"} />
-
         <Flex width={"100%"} gap={"size-100"} alignItems={"center"}>
-          <TextField
-            contextualHelp="url"
-            value={url}
-            onChange={(newValue) => {
-              setUrl(newValue);
-              setPrediction(null);
-            }}
-          />
-
           <Button
             variant="primary"
-            onPress={onGetPredictions}
+            onPress={isPlaying ? onPause : onPlay}
             isPending={isLoadingModel || isRunningInference}
-            isDisabled={url === "" || isRunningInference}
+            isDisabled={isRunningInference}
           >
-            Get predictions
+            {isPlaying ? "stop" : "start"}
           </Button>
 
           {prediction !== null && (
@@ -98,16 +89,7 @@ const ClassificationPage = () => {
           )}
         </Flex>
 
-        {url !== "" && (
-          <Image
-            alt="sample image"
-            src={url}
-            onLoad={({ target }) => {
-              console.log("data", target as HTMLImageElement);
-              setImg(target as HTMLImageElement);
-            }}
-          />
-        )}
+        <video ref={video}></video>
       </Flex>
     </View>
   );
